@@ -1,0 +1,5 @@
+{
+  "name": "Beijing Epidemic Control Dashboard",
+  "description": "A modern infectious disease monitoring dashboard for Beijing, featuring data visualization, risk mapping, and AI-powered trend analysis.",
+  "requestFramePermissions": []
+}
