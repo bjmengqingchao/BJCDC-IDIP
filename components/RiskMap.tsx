@@ -1,7 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import * as echarts from 'echarts';
 import { BEIJING_DISTRICTS, MAP_DATA_LAYERS } from '../constants';
-import { MapPin, Building2, Users, Maximize2, Minimize2 } from 'lucide-react';
+import { MapPin, Building2, Users, Maximize2, Minimize2, Download } from 'lucide-react';
+import beijingGeoJson from '../北京市.json';
 
 interface RiskMapProps {
   disease: string;
@@ -25,24 +26,18 @@ const RiskMap: React.FC<RiskMapProps> = ({ disease, isMaximized, onToggleMaximiz
       chartInstance.current = echarts.init(chartRef.current);
     }
 
-    const fetchData = async () => {
+    const loadData = () => {
       try {
         setLoading(true);
-        // Fetch official Beijing GeoJSON
-        const response = await fetch('https://geo.datav.aliyun.com/areas_v3/bound/110000_full.json');
-        const geoJson = await response.json();
-        
-        echarts.registerMap('beijing', geoJson);
-        
+        echarts.registerMap('beijing', beijingGeoJson as any);
         setLoading(false);
-        updateChart();
       } catch (error) {
         console.error("Failed to load map data", error);
         setLoading(false);
       }
     };
 
-    fetchData();
+    loadData();
 
     const handleResize = () => {
       chartInstance.current?.resize();
@@ -192,6 +187,35 @@ const RiskMap: React.FC<RiskMapProps> = ({ disease, isMaximized, onToggleMaximiz
       }
   };
 
+  const handleDownload = () => {
+    const data = MAP_DATA_LAYERS[activeLayer] as any[];
+    if (!data || data.length === 0) return;
+
+    const dataToDownload = data.map(item => ({
+      '区域': item.name,
+      '风险等级': item.riskLevel === 'high' ? '高' : item.riskLevel === 'medium' ? '中' : '低',
+      '风险指数': item.value
+    }));
+
+    const filename = `${disease}-${getLayerName()}-地图数据.csv`;
+    const headers = Object.keys(dataToDownload[0]);
+    const csvContent = [
+      headers.join(','),
+      ...dataToDownload.map(row => headers.map(header => row[header as keyof typeof row]).join(','))
+    ].join('\n');
+
+    const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', filename);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   return (
     <div className={`h-full bg-white rounded-2xl shadow-sm border border-medical-100 flex flex-col relative transition-all duration-300 ${isMaximized ? 'fixed inset-4 z-50' : ''}`}>
       <div className="p-5 border-b border-medical-50 flex justify-between items-center">
@@ -219,13 +243,22 @@ const RiskMap: React.FC<RiskMapProps> = ({ disease, isMaximized, onToggleMaximiz
                 )}
             </div>
         </div>
-        <button 
-            onClick={onToggleMaximize}
-            className="p-1.5 text-slate-400 hover:text-medical-600 hover:bg-medical-50 rounded-lg transition-colors"
-            title={isMaximized ? "还原" : "最大化"}
+        <div className="flex items-center gap-3">
+          <button 
+            onClick={handleDownload}
+            className="flex items-center gap-1 text-xs text-medical-600 bg-white border border-medical-100 hover:bg-medical-50 hover:border-medical-200 px-3 py-1.5 rounded-md transition-all shadow-sm active:scale-95"
           >
-            {isMaximized ? <Minimize2 size={18} /> : <Maximize2 size={18} />}
+            <Download size={12} />
+            下载数据
           </button>
+          <button 
+              onClick={onToggleMaximize}
+              className="p-1.5 text-slate-400 hover:text-medical-600 hover:bg-medical-50 rounded-lg transition-colors"
+              title={isMaximized ? "还原" : "最大化"}
+            >
+              {isMaximized ? <Minimize2 size={18} /> : <Maximize2 size={18} />}
+          </button>
+        </div>
       </div>
 
       <div className="flex-1 relative bg-medical-50/20 overflow-hidden">

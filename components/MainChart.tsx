@@ -12,10 +12,52 @@ interface MainChartProps {
 }
 
 const MainChart: React.FC<MainChartProps> = ({ viewId, title, disease, isMaximized, onToggleMaximize }) => {
-  const [sliderValue, setSliderValue] = useState(50);
+  const [sliderValue, setSliderValue] = useState(30);
+
+  const filteredChartData = MOCK_CHART_DATA.slice(0, sliderValue);
+  const filteredPeakData = MOCK_PEAK_DATA.filter(item => {
+    const day = parseInt(item.peakDate.split('-')[1], 10);
+    return day <= sliderValue;
+  });
 
   const handleDownload = () => {
-    alert(`正在下载 ${disease} - ${title} 数据...`);
+    let dataToDownload: any[] = [];
+    const filename = `${disease}-${title}.csv`;
+    
+    if (viewId.includes('peak')) {
+      dataToDownload = filteredPeakData.map(item => ({
+        '区域': item.region,
+        '预测峰值日期': item.peakDate,
+        '预测峰值强度': item.intensity
+      }));
+    } else {
+      dataToDownload = filteredChartData.map(item => ({
+        '日期': item.date,
+        '实时指数': item.index,
+        '预测趋势': item.prediction
+      }));
+    }
+
+    if (dataToDownload.length === 0) return;
+
+    // Convert to CSV
+    const headers = Object.keys(dataToDownload[0]);
+    const csvContent = [
+      headers.join(','),
+      ...dataToDownload.map(row => headers.map(header => row[header as keyof typeof row]).join(','))
+    ].join('\n');
+
+    // Add BOM for Excel compatibility with UTF-8
+    const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', filename);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   // Render logic based on viewId
@@ -23,7 +65,7 @@ const MainChart: React.FC<MainChartProps> = ({ viewId, title, disease, isMaximiz
     if (viewId.includes('peak')) {
       return (
         <ResponsiveContainer width="100%" height="100%">
-          <BarChart data={MOCK_PEAK_DATA} margin={{ top: 20, right: 30, left: 0, bottom: 20 }}>
+          <BarChart data={filteredPeakData} margin={{ top: 20, right: 30, left: 0, bottom: 20 }}>
             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
             <XAxis dataKey="region" stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} />
             <YAxis stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} />
@@ -66,7 +108,7 @@ const MainChart: React.FC<MainChartProps> = ({ viewId, title, disease, isMaximiz
     // Default: Index/Trend Chart
     return (
       <ResponsiveContainer width="100%" height="100%">
-        <ComposedChart data={MOCK_CHART_DATA} margin={{ top: 20, right: 30, left: 0, bottom: 20 }}>
+        <ComposedChart data={filteredChartData} margin={{ top: 20, right: 30, left: 0, bottom: 20 }}>
           <defs>
             <linearGradient id="colorIndex" x1="0" y1="0" x2="0" y2="1">
               <stop offset="5%" stopColor="#0ea5e9" stopOpacity={0.2}/>
@@ -174,38 +216,38 @@ const MainChart: React.FC<MainChartProps> = ({ viewId, title, disease, isMaximiz
           </div>
           
           {/* Interactive Slider */}
-          <div className="relative h-8 flex items-center group">
+          <div className="relative h-8 flex items-center group mx-2">
               <div className="absolute w-full h-1.5 bg-slate-200 rounded-full"></div>
               {/* Active Track */}
               <div 
                 className="absolute h-1.5 bg-medical-400 rounded-full transition-all duration-100"
-                style={{ left: '10%', right: `${100 - sliderValue}%` }}
+                style={{ left: '0%', width: `${(sliderValue / 30) * 100}%` }}
               ></div>
               
               {/* Left Thumb */}
-              <div className="absolute left-[10%] w-4 h-4 bg-white border-2 border-medical-500 rounded-full shadow-md cursor-grab -translate-x-1/2 hover:scale-110 transition-transform"></div>
+              <div className="absolute left-0 w-4 h-4 bg-white border-2 border-medical-500 rounded-full shadow-md cursor-grab -translate-x-1/2 hover:scale-110 transition-transform"></div>
               
               {/* Right Thumb (Interactive) */}
               <input 
                 type="range" 
-                min="20" 
-                max="90" 
+                min="1" 
+                max="30" 
                 value={sliderValue} 
                 onChange={(e) => setSliderValue(Number(e.target.value))}
                 className="absolute w-full opacity-0 cursor-pointer z-10"
               />
               <div 
-                className="absolute w-4 h-4 bg-white border-2 border-medical-500 rounded-full shadow-md pointer-events-none translate-x-1/2 transition-all duration-75 hover:scale-110"
-                style={{ right: `${100 - sliderValue}%` }}
+                className="absolute w-4 h-4 bg-white border-2 border-medical-500 rounded-full shadow-md pointer-events-none -translate-x-1/2 transition-all duration-75 hover:scale-110"
+                style={{ left: `${(sliderValue / 30) * 100}%` }}
               ></div>
 
                {/* Labels */}
-               <div className="absolute left-[10%] top-6 -translate-x-1/2 text-[10px] text-slate-500 font-mono">2023-11-01</div>
+               <div className="absolute left-0 top-6 -translate-x-1/2 text-[10px] text-slate-500 font-mono">2023-11-01</div>
                <div 
-                 className="absolute top-6 translate-x-1/2 text-[10px] text-medical-600 font-bold font-mono transition-all duration-75"
-                 style={{ right: `${100 - sliderValue}%` }}
+                 className="absolute top-6 -translate-x-1/2 text-[10px] text-medical-600 font-bold font-mono transition-all duration-75"
+                 style={{ left: `${(sliderValue / 30) * 100}%` }}
                >
-                 2023-11-{Math.floor(sliderValue / 3.3)}
+                 2023-11-{sliderValue.toString().padStart(2, '0')}
                </div>
           </div>
         </div>
